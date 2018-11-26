@@ -2,6 +2,14 @@ int pins[] = {8, 9, 10, 11};
 int state = 0;
 int flag = 0;
 
+enum AppState
+{
+    AWAITING_REQUEST,
+    AWAITING_MESSAGE
+};
+
+AppState appState = AWAITING_REQUEST;
+
 void setup()
 {
     Serial.println("initializing");
@@ -12,7 +20,36 @@ void setup()
     Serial.begin(9600);
 }
 
-void loop()
+void get_request()
+{
+    char expected[] = "<requesting code>";
+    int idx = 0;
+    for (;;)
+    {
+        if (Serial.available() > 0)
+        {
+            char val = Serial.read();
+            if (val == expected[idx])
+            {
+                Serial.println("recieved expected char '" + String(val) + "' while getting request");
+                idx++;
+                if (expected[idx] == '\0')
+                {
+                    Serial.println("recieved full request");
+                    appState = AWAITING_MESSAGE;
+                    return;
+                }
+            }
+            else
+            {
+                Serial.println("unexpected char '" + String(val) + "' while getting request");
+                idx = 0;
+            }
+        }
+    }
+}
+
+void get_message()
 {
     if (Serial.available() > 0)
     {
@@ -43,5 +80,19 @@ void loop()
             digitalWrite(pins[3], LOW);
             break;
         }
+    }
+    appState = AWAITING_REQUEST;
+}
+
+void loop()
+{
+    switch (appState)
+    {
+    case AWAITING_REQUEST:
+        get_request();
+        break;
+    case AWAITING_MESSAGE:
+        get_message();
+        break;
     }
 }
