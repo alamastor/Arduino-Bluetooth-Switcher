@@ -1,3 +1,6 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial bleSerial(2, 3); // RX, TX
 int pins[] = {8, 9, 10, 11};
 int state = 0;
 int flag = 0;
@@ -18,6 +21,7 @@ void setup()
         pinMode(pins[i], OUTPUT);
     }
     Serial.begin(9600);
+    bleSerial.begin(9600);
 }
 
 void get_request()
@@ -26,16 +30,18 @@ void get_request()
     int idx = 0;
     for (;;)
     {
-        if (Serial.available() > 0)
+        if (bleSerial.available() > 0)
         {
-            char val = Serial.read();
+            char val = bleSerial.read();
             if (val == expected[idx])
             {
-                Serial.println("recieved expected char '" + String(val) + "' while getting request");
                 idx++;
                 if (expected[idx] == '\0')
                 {
-                    Serial.println("recieved full request");
+                    Serial.println("recieved code request");
+                    char str[] = {'h', 'i', '\0'};
+                    Serial.println(str);
+                    bleSerial.write(str);
                     appState = AWAITING_MESSAGE;
                     return;
                 }
@@ -51,11 +57,11 @@ void get_request()
 
 void get_message()
 {
-    if (Serial.available() > 0)
+    if (bleSerial.available() > 0)
     {
-        char val = Serial.read();
-        char str[] = {val, '\0'};
-        Serial.println(str);
+        char val = bleSerial.read();
+        Serial.println("recieved msg");
+        Serial.println(val);
 
         switch (val)
         {
@@ -80,8 +86,8 @@ void get_message()
             digitalWrite(pins[3], LOW);
             break;
         }
+        appState = AWAITING_REQUEST;
     }
-    appState = AWAITING_REQUEST;
 }
 
 void loop()
