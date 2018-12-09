@@ -1,4 +1,6 @@
 #include <SoftwareSerial.h>
+#include "src/challenge.h"
+#include "src/parsemessage.h"
 
 SoftwareSerial bleSerial(2, 3); // RX, TX
 int pins[] = {8, 9, 10, 11};
@@ -11,7 +13,9 @@ enum AppState
     AWAITING_MESSAGE
 };
 
-AppState appState = AWAITING_REQUEST;
+unsigned long sharedKey;
+
+AppState appState;
 
 void setup()
 {
@@ -22,11 +26,26 @@ void setup()
     }
     Serial.begin(9600);
     bleSerial.begin(9600);
+    randomSeed(analogRead(13));
+    await_request();
+}
+
+void await_request()
+{
+    Serial.println("awaiting request");
+    bleSerial.print("<awaiting request>");
+    appState = AWAITING_REQUEST;
+}
+
+void await_message()
+{
+    Serial.println("awaiting message");
+    appState = AWAITING_MESSAGE;
 }
 
 void get_request()
 {
-    char expected[] = "<requesting code>";
+    char expected[] = "<requesting chall>";
     int idx = 0;
     for (;;)
     {
@@ -38,18 +57,20 @@ void get_request()
                 idx++;
                 if (expected[idx] == '\0')
                 {
-                    Serial.println("recieved code request");
-                    char str[] = {'h', 'i', '\0'};
-                    Serial.println(str);
-                    bleSerial.write(str);
-                    appState = AWAITING_MESSAGE;
+                    Serial.println("recieved challenge request");
+                    uint8_t *challengeCode = get_challenge_code();
+                    for (int i = 0; i < CHALLENGE_CODE_LENGTH; i++)
+                    {
+                        bleSerial.write(challengeCode[i]);
+                    }
+                    await_message();
                     return;
                 }
             }
             else
             {
                 Serial.println("unexpected char '" + String(val) + "' while getting request");
-                idx = 0;
+                await_request();
             }
         }
     }
@@ -57,37 +78,28 @@ void get_request()
 
 void get_message()
 {
-    if (bleSerial.available() > 0)
+    Message message;
+    if (parse_message_stream(message, bleSerial) == 0)
     {
-        char val = bleSerial.read();
-        Serial.println("recieved msg");
-        Serial.println(val);
-
-        switch (val)
+        Serial.println("successfully parsed message stream");
+        if (response_valid(message.code, message.hash))
         {
-        case '1':
-            digitalWrite(pins[0], HIGH);
+            char pin_idx = constrain(message.code, 0, 3);
+            Serial.println("message valid, opening lock " + String(pin_idx + 1));
+            digitalWrite(pins[pin_idx], HIGH);
             delay(1000);
-            digitalWrite(pins[0], LOW);
-            break;
-        case '2':
-            digitalWrite(pins[1], HIGH);
-            delay(1000);
-            digitalWrite(pins[1], LOW);
-            break;
-        case '3':
-            digitalWrite(pins[2], HIGH);
-            delay(1000);
-            digitalWrite(pins[2], LOW);
-            break;
-        case '4':
-            digitalWrite(pins[3], HIGH);
-            delay(1000);
-            digitalWrite(pins[3], LOW);
-            break;
+            digitalWrite(pins[pin_idx], LOW);
         }
-        appState = AWAITING_REQUEST;
+        else
+        {
+            Serial.println("message validation failed");
+        }
     }
+    else
+    {
+        Serial.println("failed to parse message stream");
+    }
+    await_request();
 }
 
 void loop()
