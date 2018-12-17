@@ -69,7 +69,8 @@ void get_request()
             }
             else
             {
-                Serial.println("unexpected char '" + String(val) + "' while getting request");
+                Serial.println("unexpected char '" + String(val) + "' at index '" + String(idx) + "' while getting request");
+                idx = 0;
                 await_request();
             }
         }

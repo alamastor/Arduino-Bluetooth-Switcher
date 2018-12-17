@@ -29,16 +29,12 @@ bool response_valid(unsigned char code, unsigned char hash[HASH_LENGTH])
     for (int i = 0; i < CHALLENGE_CODE_LENGTH; i++)
         sha256.write(challengeCode[i]);
     sha256.write(code);
-
     uint8_t *expected_hash = sha256.resultHmac();
+
     bool hash_valid(true);
     for (int i = 0; i < HASH_LENGTH; i++)
-    {
         if (expected_hash[i] != hash[i])
-        {
             hash_valid = false;
-        }
-    }
 
     if (!hash_valid)
     {
